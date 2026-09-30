@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🏉 ラグビー試合記録 v1.0</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 10px; background: #f0f0f0; touch-action: manipulation; color: #333; }
+    h1 { font-size: 1.1rem; margin: 0 0 10px; text-align: center; }
+    
+    .view-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; margin: 0 auto; }
+    .active-view { display: flex; }
+
+    /* 設定エリア */
+    .config-panel { width: 100%; background: white; padding: 10px; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .radio-group { display: flex; gap: 15px; justify-content: center; margin-bottom: 10px; font-weight: bold; align-items: center; }
+    .radio-group label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    .timer-text { font-family: monospace; font-size: 1.2rem; color: #333; margin-left: 2px; }
+    .timer-running { color: #d32f2f; animation: blink 1s infinite; }
+    @keyframes blink { 50% { opacity: 0.5; } }
+    
+    .timer-controls { display: flex; justify-content: center; margin-bottom: 15px; }
+    #btnTimerToggle { padding: 10px 20px; font-size: 1.1rem; font-weight: bold; border: none; border-radius: 8px; background: #4caf50; color: white; cursor: pointer; width: 100%; }
+    #btnTimerToggle.running { background: #ff9800; }
+
+    .team-inputs { display: flex; justify-content: space-between; gap: 10px; width: 100%; }
+    .team-input-box { flex: 1; display: flex; flex-direction: column; font-size: 0.85rem; color: #555; align-items: center; }
+    .team-input-box input { width: 100%; box-sizing: border-box; padding: 8px; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; margin-top: 4px; font-weight: bold; text-align: center; }
+
+    /* イベントテーブル */
+    .event-table { width: 100%; background: white; border-collapse: collapse; border-radius: 8px; overflow: hidden; font-size: 0.9rem; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
+    .event-table th { background: #eee; padding: 8px 2px; font-size: 0.85rem; border-bottom: 2px solid #ddd; }
+    .event-table td { border-bottom: 1px solid #eee; padding: 8px 2px; vertical-align: middle; }
+    .ev-label { font-weight: bold; font-size: 0.85rem; color: #424242; white-space: nowrap; }
+    
+    /* 入力ボタン */
+    .btn-wrap { display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; }
+    .btn-ev { padding: 8px; font-size: 0.9rem; font-weight: bold; border: 1px solid #ccc; border-radius: 6px; cursor: pointer; color: white; min-width: 45px; }
+    .btn-ev:active { opacity: 0.7; }
+    .bg-add { background: #1976d2; border-color: #0d47a1; }
+    .bg-ok { background: #4caf50; border-color: #388e3c; }
+    .bg-ng { background: #e53935; border-color: #c62828; }
+    .bg-keep { background: #fb8c00; border-color: #ef6c00; }
+    .bg-lost { background: #757575; border-color: #424242; }
+
+    .stat-text { display: block; font-size: 0.75rem; color: #666; margin-top: 4px; }
+
+    /* Undoボタン */
+    #btnUndo { width: 100%; padding: 12px; font-size: 0.9rem; border: 1px dashed #999; border-radius: 8px; cursor: pointer; background: #fafafa; color: #555; margin-bottom: 15px; font-weight: bold; }
+    #btnUndo:disabled { color: #ccc; border-color: #eee; background: #fff; cursor: not-allowed; }
+
+    /* アクションボタン全般 */
+    .btn-action { width: 100%; padding: 15px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; background: #607d8b; margin-bottom: 10px; }
+    .btn-primary { background: #1976d2; }
+    .btn-danger { background: #757575; }
+
+    /* 集計テーブル */
+    .summary-section { width: 100%; background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .summary-title { font-size: 1rem; font-weight: bold; border-bottom: 2px solid #eee; padding-bottom: 5px; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+    .summary-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
+    .summary-table th, .summary-table td { padding: 8px 2px; border-bottom: 1px dashed #eee; }
+    .summary-table th { color: #666; font-weight: normal; font-size: 0.8rem; }
+    .td-val { font-weight: bold; color: #1976d2; }
+    
+    .warning-box { width: 100%; background: #ffebee; color: #c62828; padding: 12px; border-radius: 8px; font-size: 0.9rem; line-height: 1.4; margin-bottom: 15px; border: 1px solid #ef9a9a; box-sizing: border-box; text-align: center; }
+    .bottom-buttons { display: flex; gap: 8px; width: 100%; margin-bottom: 20px; }
+    .bottom-buttons .btn-action { margin-bottom: 0; padding: 12px 5px; font-size: 0.9rem; flex: 1; }
+  </style>
+</head>
+<body>
+
+  <h1><span id="appTitle">🏉 ラグビー試合記録 v1.0</span></h1>
+
+  <!-- メイン画面 -->
+  <div id="mainView" class="view-container active-view">
+    
+    <div class="config-panel">
+      <div class="radio-group">
+        <label><input type="radio" name="halfRadio" value="first" checked> 前半 <span id="timerFirst" class="timer-text">00:00</span></label>
+        <label><input type="radio" name="halfRadio" value="second"> 後半 <span id="timerSecond" class="timer-text">00:00</span></label>
+      </div>
+      <div class="timer-controls">
+        <button id="btnTimerToggle" onclick="toggleTimer()">▶ 計測開始</button>
+      </div>
+      <div class="team-inputs">
+        <div class="team-input-box">
+          <span>左サイド</span>
+          <input type="text" id="inputLeft" value="シラエビ">
+        </div>
+        <div class="team-input-box">
+          <span>右サイド</span>
+          <input type="text" id="inputRight" value="ズワイガニ">
+        </div>
+      </div>
+    </div>
+
+    <table class="event-table">
+      <thead>
+        <tr>
+          <th id="thLeft" style="width:38%;">シラエビ (左)</th>
+          <th style="width:24%;">イベント</th>
+          <th id="thRight" style="width:38%;">ズワイガニ (右)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- トライ -->
+        <tr>
+          <td>
+            <div class="btn-wrap"><button class="btn-ev bg-add" onclick="addEv('L','トライ','追加')">追加</button></div>
+            <span class="stat-text" id="st-L-try">0</span>
+          </td>
+          <td class="ev-label">トライ</td>
+          <td>
+            <div class="btn-wrap"><button class="btn-ev bg-add" onclick="addEv('R','トライ','追加')">追加</button></div>
+            <span class="stat-text" id="st-R-try">0</span>
+          </td>
+        </tr>
+        <!-- コンバージョン -->
+        <tr>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-ok" onclick="addEv('L','コンバージョンG','成功')">〇</button>
+              <button class="btn-ev bg-ng" onclick="addEv('L','コンバージョンG','失敗')">✕</button>
+            </div>
+            <span class="stat-text" id="st-L-cg">〇0 / ✕0</span>
+          </td>
+          <td class="ev-label">コンバージ<br>ョンG</td>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-ok" onclick="addEv('R','コンバージョンG','成功')">〇</button>
+              <button class="btn-ev bg-ng" onclick="addEv('R','コンバージョンG','失敗')">✕</button>
+            </div>
+            <span class="stat-text" id="st-R-cg">〇0 / ✕0</span>
+          </td>
+        </tr>
+        <!-- ペナルティG -->
+        <tr>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-ok" onclick="addEv('L','ペナルティG','成功')">〇</button>
+              <button class="btn-ev bg-ng" onclick="addEv('L','ペナルティG','失敗')">✕</button>
+            </div>
+            <span class="stat-text" id="st-L-pg">〇0 / ✕0</span>
+          </td>
+          <td class="ev-label">ペナルティ<br>G</td>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-ok" onclick="addEv('R','ペナルティG','成功')">〇</button>
+              <button class="btn-ev bg-ng" onclick="addEv('R','ペナルティG','失敗')">✕</button>
+            </div>
+            <span class="stat-text" id="st-R-pg">〇0 / ✕0</span>
+          </td>
+        </tr>
+        <!-- ドロップG -->
+        <tr>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-ok" onclick="addEv('L','ドロップG','成功')">〇</button>
+              <button class="btn-ev bg-ng" onclick="addEv('L','ドロップG','失敗')">✕</button>
+            </div>
+            <span class="stat-text" id="st-L-dg">〇0 / ✕0</span>
+          </td>
+          <td class="ev-label">ドロップG</td>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-ok" onclick="addEv('R','ドロップG','成功')">〇</button>
+              <button class="btn-ev bg-ng" onclick="addEv('R','ドロップG','失敗')">✕</button>
+            </div>
+            <span class="stat-text" id="st-R-dg">〇0 / ✕0</span>
+          </td>
+        </tr>
+        <!-- スクラム -->
+        <tr>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-keep" onclick="addEv('L','スクラム(マイボール)','キープ')">キープ</button>
+              <button class="btn-ev bg-lost" onclick="addEv('L','スクラム(マイボール)','ロスト')">ロスト</button>
+            </div>
+            <span class="stat-text" id="st-L-sc">K:0 / L:0</span>
+          </td>
+          <td class="ev-label">スクラム<br><span style="font-size:0.6rem;font-weight:normal;">(マイボール)</span></td>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-keep" onclick="addEv('R','スクラム(マイボール)','キープ')">キープ</button>
+              <button class="btn-ev bg-lost" onclick="addEv('R','スクラム(マイボール)','ロスト')">ロスト</button>
+            </div>
+            <span class="stat-text" id="st-R-sc">K:0 / L:0</span>
+          </td>
+        </tr>
+        <!-- ラインアウト -->
+        <tr>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-keep" onclick="addEv('L','ラインアウト(マイ)','キープ')">キープ</button>
+              <button class="btn-ev bg-lost" onclick="addEv('L','ラインアウト(マイ)','ロスト')">ロスト</button>
+            </div>
+            <span class="stat-text" id="st-L-lo">K:0 / L:0</span>
+          </td>
+          <td class="ev-label">ラインアウト<br><span style="font-size:0.6rem;font-weight:normal;">(マイボール)</span></td>
+          <td>
+            <div class="btn-wrap">
+              <button class="btn-ev bg-keep" onclick="addEv('R','ラインアウト(マイ)','キープ')">キープ</button>
+              <button class="btn-ev bg-lost" onclick="addEv('R','ラインアウト(マイ)','ロスト')">ロスト</button>
+            </div>
+            <span class="stat-text" id="st-R-lo">K:0 / L:0</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <button id="btnUndo" onclick="undoEvent()" disabled>↩ 直前の入力を取り消す</button>
+    <button class="btn-action btn-primary" onclick="goToSummary()">試合終了後、データ集計へ</button>
+  </div>
+
+
+  <!-- 集計画面 -->
+  <div id="summaryView" class="view-container">
+    
+    <div class="summary-section">
+      <div class="summary-title">◎ スコア (合計)</div>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th id="scoreTeamA">チームA</th>
+            <th id="scoreTeamB">チームB</th>
+          </tr>
+        </thead>
+        <tbody id="scoreTbody">
+          <!-- JSで生成 -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-title">◎ スタッツ (試合全体)</div>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>左サイド</th>
+            <th>右サイド</th>
+          </tr>
+        </thead>
+        <tbody id="statsTbody">
+          <!-- JSで生成 -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="warning-box">
+      <strong>※注意！</strong> CSV書出し後、リセットボタンを押してください。
+    </div>
+
+    <div class="bottom-buttons">
+      <button class="btn-action" onclick="goToMain()">戻る</button>
+      <button class="btn-action btn-primary" onclick="exportCSV()">📄 CSV書出</button>
+      <button class="btn-action btn-danger" onclick="resetAll()">リセット</button>
+    </div>
+  </div>
+
+  <script>
+    // --- Service Worker 登録 ---
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        console.log('ServiceWorker registered.');
+      }).catch(err => {
+        console.log('ServiceWorker registration failed:', err);
+      });
+    }
+
+    // --- データ構造 ---
+    let matchData = {
+      teams: { A: "シラエビ", B: "ズワイガニ" },
+      ticks: { first: 0, second: 0 },
+      events: [] 
+    };
+    let currentHalf = 'first'; 
+    let isTimerRunning = false;
+    let globalTimer = null;
+
+    function loadData() {
+      const saved = localStorage.getItem('rugby_record_v1');
+      if (saved) {
+        matchData = JSON.parse(saved);
+        updateUIFromData();
+      }
+      updateTimerDisplay();
+    }
+    function saveData() {
+      localStorage.setItem('rugby_record_v1', JSON.stringify(matchData));
+    }
+
+    // --- 設定・UI連動 ---
+    document.querySelectorAll('input[name="halfRadio"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        currentHalf = e.target.value;
+        if (isTimerRunning) toggleTimer(); // ハーフ切替時は安全のためタイマー停止
+        updateUIFromData();
+      });
+    });
+
+    document.getElementById('inputLeft').addEventListener('input', (e) => {
+      if (currentHalf === 'first') matchData.teams.A = e.target.value;
+      else matchData.teams.B = e.target.value;
+      saveData();
+      updateLabelsOnly();
+    });
+    
+    document.getElementById('inputRight').addEventListener('input', (e) => {
+      if (currentHalf === 'first') matchData.teams.B = e.target.value;
+      else matchData.teams.A = e.target.value;
+      saveData();
+      updateLabelsOnly();
+    });
+
+    function updateUIFromData() {
+      document.querySelector(`input[name="halfRadio"][value="${currentHalf}"]`).checked = true;
+      updateLabelsOnly();
+      renderStats();
+      updateTimerDisplay();
+      updateUndoButton();
+    }
+
+    function updateLabelsOnly() {
+      const leftName = currentHalf === 'first' ? matchData.teams.A : matchData.teams.B;
+      const rightName = currentHalf === 'first' ? matchData.teams.B : matchData.teams.A;
+      document.getElementById('inputLeft').value = leftName;
+      document.getElementById('inputRight').value = rightName;
+      document.getElementById('thLeft').textContent = `${leftName} (左)`;
+      document.getElementById('thRight').textContent = `${rightName} (右)`;
+    }
+
+    // --- タイマー処理 ---
+    function formatTime(seconds) {
+      const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const s = String(seconds % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function updateTimerDisplay() {
+      const elFirst = document.getElementById('timerFirst');
+      const elSecond = document.getElementById('timerSecond');
+      elFirst.textContent = formatTime(matchData.ticks.first);
+      elSecond.textContent = formatTime(matchData.ticks.second);
+      
+      if (isTimerRunning) {
+        if(currentHalf === 'first') { elFirst.classList.add('timer-running'); elSecond.classList.remove('timer-running'); }
+        else { elSecond.classList.add('timer-running'); elFirst.classList.remove('timer-running'); }
+      } else {
+        elFirst.classList.remove('timer-running');
+        elSecond.classList.remove('timer-running');
+      }
+    }
+
+    function toggleTimer() {
+      const btn = document.getElementById('btnTimerToggle');
+      if (isTimerRunning) {
+        clearInterval(globalTimer);
+        globalTimer = null;
+        isTimerRunning = false;
+        btn.textContent = '▶ 計測開始';
+        btn.classList.remove('running');
+      } else {
+        globalTimer = setInterval(() => {
+          matchData.ticks[currentHalf]++;
+          saveData();
+          updateTimerDisplay();
+        }, 1000);
+        isTimerRunning = true;
+        btn.textContent = '⏸ 一時停止';
+        btn.classList.add('running');
+      }
+      updateTimerDisplay();
+    }
+
+    // --- イベント記録 ---
+    function addEv(side, type, result) {
+      const teamName = side === 'L' ? 
+        (currentHalf === 'first' ? matchData.teams.A : matchData.teams.B) : 
+        (currentHalf === 'first' ? matchData.teams.B : matchData.teams.A);
+
+      matchData.events.push({ 
+        id: Date.now(), 
+        half: currentHalf, 
+        side: side, 
+        team: teamName, 
+        type: type,
+        result: result,
+        tickIndex: matchData.ticks[currentHalf] // 記録時の秒数を保存
+      });
+      
+      saveData();
+      renderStats();
+      updateUndoButton();
+    }
+
+    function undoEvent() {
+      if (matchData.events.length === 0) return;
+      matchData.events.pop();
+      saveData();
+      renderStats();
+      updateUndoButton();
+    }
+
+    function updateUndoButton() {
+      const btn = document.getElementById('btnUndo');
+      if (matchData.events.length === 0) {
+        btn.disabled = true;
+        btn.textContent = '↩ 直前の入力を取り消す (履歴なし)';
+      } else {
+        btn.disabled = false;
+        const last = matchData.events[matchData.events.length - 1];
+        btn.textContent = `↩ 取り消す: ${last.team} の ${last.type} (${last.result})`;
+      }
+    }
+
+    // --- 統計表示（メイン画面用） ---
+    function renderStats() {
+      const sides = ['L', 'R'];
+      
+      sides.forEach(side => {
+        const teamName = side === 'L' ? 
+          (currentHalf === 'first' ? matchData.teams.A : matchData.teams.B) : 
+          (currentHalf === 'first' ? matchData.teams.B : matchData.teams.A);
+          
+        const evs = matchData.events.filter(e => e.team === teamName);
+        
+        // トライ
+        const trys = evs.filter(e => e.type === 'トライ').length;
+        document.getElementById(`st-${side}-try`).textContent = `${trys}回`;
+        
+        // キック系
+        const kicks = ['コンバージョンG', 'ペナルティG', 'ドロップG'];
+        const ids = ['cg', 'pg', 'dg'];
+        kicks.forEach((k, i) => {
+          const ok = evs.filter(e => e.type === k && e.result === '成功').length;
+          const ng = evs.filter(e => e.type === k && e.result === '失敗').length;
+          document.getElementById(`st-${side}-${ids[i]}`).textContent = `〇${ok} / ✕${ng}`;
+        });
+        
+        // セットプレー
+        const sets = ['スクラム(マイボール)', 'ラインアウト(マイ)'];
+        const sids = ['sc', 'lo'];
+        sets.forEach((s, i) => {
+          const keep = evs.filter(e => e.type === s && e.result === 'キープ').length;
+          const lost = evs.filter(e => e.type === s && e.result === 'ロスト').length;
+          document.getElementById(`st-${side}-${sids[i]}`).textContent = `K:${keep} / L:${lost}`;
+        });
+      });
+    }
+
+    // --- 集計画面遷移 ---
+    function goToSummary() {
+      if (isTimerRunning) toggleTimer(); // タイマー強制停止
+      
+      document.getElementById('appTitle').textContent = '🏉 データ集計';
+      document.getElementById('mainView').classList.remove('active-view');
+      document.getElementById('summaryView').classList.add('active-view');
+      generateSummary();
+    }
+
+    function goToMain() {
+      document.getElementById('appTitle').textContent = '🏉 ラグビー試合記録 v1.0';
+      document.getElementById('summaryView').classList.remove('active-view');
+      document.getElementById('mainView').classList.add('active-view');
+    }
+
+    // --- 集計ロジック（UI用：全体合算のみ） ---
+    function calcTotalScore(teamName) {
+      let score = 0;
+      matchData.events.filter(e => e.team === teamName).forEach(e => {
+        if(e.type === 'トライ') score += 5;
+        if(e.type === 'コンバージョンG' && e.result === '成功') score += 2;
+        if(e.type === 'ペナルティG' && e.result === '成功') score += 3;
+        if(e.type === 'ドロップG' && e.result === '成功') score += 3;
+      });
+      return score;
+    }
+
+    function getStatStr(teamName, type, resOk, resNg) {
+      const evs = matchData.events.filter(e => e.team === teamName && e.type === type);
+      const ok = evs.filter(e => e.result === resOk).length;
+      const ng = evs.filter(e => e.result === resNg).length;
+      const total = ok + ng;
+      const rate = total > 0 ? Math.round((ok/total)*100) : 0;
+      return `${ok} / ${total} (${rate}%)`;
+    }
+
+    function generateSummary() {
+      const tA = matchData.teams.A;
+      const tB = matchData.teams.B;
+      
+      document.getElementById('scoreTeamA').textContent = tA;
+      document.getElementById('scoreTeamB').textContent = tB;
+      
+      const scTbody = document.getElementById('scoreTbody');
+      scTbody.innerHTML = `
+        <tr style="font-weight:bold; background:#f9f9f9;"><td>総得点</td><td class="td-val">${calcTotalScore(tA)}点</td><td class="td-val">${calcTotalScore(tB)}点</td></tr>
+      `;
+
+      const stTbody = document.getElementById('statsTbody');
+      const trysA = matchData.events.filter(e => e.team === tA && e.type === 'トライ').length;
+      const trysB = matchData.events.filter(e => e.team === tB && e.type === 'トライ').length;
+      
+      stTbody.innerHTML = `
+        <tr><td>トライ獲得数</td><td class="td-val">${trysA}回</td><td class="td-val">${trysB}回</td></tr>
+        <tr><td>コンバージョン<br>(成功/機会)</td><td class="td-val">${getStatStr(tA,'コンバージョンG','成功','失敗')}</td><td class="td-val">${getStatStr(tB,'コンバージョンG','成功','失敗')}</td></tr>
+        <tr><td>ペナルティG<br>(成功/機会)</td><td class="td-val">${getStatStr(tA,'ペナルティG','成功','失敗')}</td><td class="td-val">${getStatStr(tB,'ペナルティG','成功','失敗')}</td></tr>
+        <tr><td>マイボール スクラム<br>(確保/機会)</td><td class="td-val">${getStatStr(tA,'スクラム(マイボール)','キープ','ロスト')}</td><td class="td-val">${getStatStr(tB,'スクラム(マイボール)','キープ','ロスト')}</td></tr>
+        <tr><td>マイボール ラインアウト<br>(確保/機会)</td><td class="td-val">${getStatStr(tA,'ラインアウト(マイ)','キープ','ロスト')}</td><td class="td-val">${getStatStr(tB,'ラインアウト(マイ)','キープ','ロスト')}</td></tr>
+      `;
+    }
+
+    // --- CSV出力 (時間帯分割の超詳細版) ---
+    function getEventsByPart(teamName, halfStr, part) {
+      let totalTicks = matchData.ticks[halfStr];
+      let midpoint = Math.floor(totalTicks / 2);
+      return matchData.events.filter(e => {
+        if (e.team !== teamName || e.half !== halfStr) return false;
+        let tIndex = e.tickIndex || 0;
+        if (part === 0) return tIndex < midpoint;  // 前
+        if (part === 1) return tIndex >= midpoint; // 後
+        return true; // 合計
+      });
+    }
+
+    function calcScorePart(teamName, halfStr, part) {
+      let score = 0;
+      let evs = halfStr === 'all' ? matchData.events.filter(e => e.team === teamName) : getEventsByPart(teamName, halfStr, part);
+      evs.forEach(e => {
+        if(e.type === 'トライ') score += 5;
+        if(e.type === 'コンバージョンG' && e.result === '成功') score += 2;
+        if(e.type === 'ペナルティG' && e.result === '成功') score += 3;
+        if(e.type === 'ドロップG' && e.result === '成功') score += 3;
+      });
+      return score;
+    }
+
+    function countEvPart(teamName, halfStr, part, type, resOk, resNg) {
+      let evs = getEventsByPart(teamName, halfStr, part).filter(e => e.type === type);
+      if(type === 'トライ') return evs.length; // トライは成功のみ
+      
+      const ok = evs.filter(e => e.result === resOk).length;
+      const ng = evs.filter(e => e.result === resNg).length;
+      return `${ok},${ng}`; // CSVのカラム用にカンマ区切りで返す
+    }
+
+    function exportCSV() {
+      const tA = matchData.teams.A;
+      const tB = matchData.teams.B;
+      let csv = "\uFEFF"; 
+      
+      // 1. スコア集計
+      csv += "【スコア集計】\n";
+      csv += `チーム,前半(前),前半(後),後半(前),後半(後),合計\n`;
+      csv += `${tA},${calcScorePart(tA,'first',0)},${calcScorePart(tA,'first',1)},${calcScorePart(tA,'second',0)},${calcScorePart(tA,'second',1)},${calcScorePart(tA,'all',2)}\n`;
+      csv += `${tB},${calcScorePart(tB,'first',0)},${calcScorePart(tB,'first',1)},${calcScorePart(tB,'second',0)},${calcScorePart(tB,'second',1)},${calcScorePart(tB,'all',2)}\n\n`;
+
+      // 2. スタッツ詳細（チームA）
+      csv += `【スタッツ詳細：${tA}】\n`;
+      csv += `時間帯,トライ,コンバージョン(〇),コンバージョン(✕),ペナルティG(〇),ペナルティG(✕),ドロップG(〇),ドロップG(✕),スクラム(確保),スクラム(喪失),ラインアウト(確保),ラインアウト(喪失)\n`;
+      
+      const parts = [
+        { h: 'first', p: 0, n: '前半(前)' },
+        { h: 'first', p: 1, n: '前半(後)' },
+        { h: 'second', p: 0, n: '後半(前)' },
+        { h: 'second', p: 1, n: '後半(後)' }
+      ];
+
+      parts.forEach(pt => {
+        csv += `${pt.n},${countEvPart(tA, pt.h, pt.p, 'トライ')},`;
+        csv += `${countEvPart(tA, pt.h, pt.p, 'コンバージョンG', '成功', '失敗')},`;
+        csv += `${countEvPart(tA, pt.h, pt.p, 'ペナルティG', '成功', '失敗')},`;
+        csv += `${countEvPart(tA, pt.h, pt.p, 'ドロップG', '成功', '失敗')},`;
+        csv += `${countEvPart(tA, pt.h, pt.p, 'スクラム(マイボール)', 'キープ', 'ロスト')},`;
+        csv += `${countEvPart(tA, pt.h, pt.p, 'ラインアウト(マイ)', 'キープ', 'ロスト')}\n`;
+      });
+      csv += "\n";
+
+      // 3. スタッツ詳細（チームB）
+      csv += `【スタッツ詳細：${tB}】\n`;
+      csv += `時間帯,トライ,コンバージョン(〇),コンバージョン(✕),ペナルティG(〇),ペナルティG(✕),ドロップG(〇),ドロップG(✕),スクラム(確保),スクラム(喪失),ラインアウト(確保),ラインアウト(喪失)\n`;
+      
+      parts.forEach(pt => {
+        csv += `${pt.n},${countEvPart(tB, pt.h, pt.p, 'トライ')},`;
+        csv += `${countEvPart(tB, pt.h, pt.p, 'コンバージョンG', '成功', '失敗')},`;
+        csv += `${countEvPart(tB, pt.h, pt.p, 'ペナルティG', '成功', '失敗')},`;
+        csv += `${countEvPart(tB, pt.h, pt.p, 'ドロップG', '成功', '失敗')},`;
+        csv += `${countEvPart(tB, pt.h, pt.p, 'スクラム(マイボール)', 'キープ', 'ロスト')},`;
+        csv += `${countEvPart(tB, pt.h, pt.p, 'ラインアウト(マイ)', 'キープ', 'ロスト')}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const now = new Date();
+      const pad = (num) => String(num).padStart(2, '0');
+      const ts = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const filename = `rugby_record_${ts}.csv`;
+
+      if (navigator.canShare) {
+        const file = new File([blob], filename, { type: 'text/csv' });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: filename }).catch(console.error);
+          return;
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function resetAll() {
+      if(confirm('すべての記録データを削除して初期状態に戻しますか？')) {
+        if (globalTimer) clearInterval(globalTimer);
+        localStorage.removeItem('rugby_record_v1');
+        location.reload(); 
+      }
+    }
+
+    loadData();
+    updateClock();
+  </script>
+</body>
+</html>

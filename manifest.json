@@ -1,0 +1,20 @@
+{
+  "name": "ラグビー試合記録",
+  "short_name": "試合記録",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f0f0f0",
+  "theme_color": "#1976d2",
+  "icons": [
+    {
+      "src": "icon_rugby-Record-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon_rugby-Record-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
