@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>🏉 ラグビー試合記録 v1.1</title>
+  <title>🏉 ラグビー試合記録 v1.2</title>
   <link rel="manifest" href="manifest.json">
 
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-8PJYQKC5F5"></script>
@@ -19,6 +19,7 @@
   <style>
     body { font-family: sans-serif; margin: 0; padding: 10px; background: #f0f0f0; touch-action: manipulation; color: #333; }
     h1 { font-size: 1.1rem; margin: 0 0 10px; text-align: center; }
+    .clock-display { font-weight: normal; font-size: 0.9rem; margin-left: 10px; color: #666; }
     
     .view-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; margin: 0 auto; }
     .active-view { display: flex; }
@@ -45,15 +46,15 @@
     .event-table td { border-bottom: 1px solid #eee; padding: 8px 2px; vertical-align: middle; }
     .ev-label { font-weight: bold; font-size: 0.85rem; color: #424242; white-space: nowrap; }
     
-    /* 入力ボタン */
+    /* 入力ボタン（緑と赤に統一） */
     .btn-wrap { display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; }
     .btn-ev { padding: 8px; font-size: 0.9rem; font-weight: bold; border: 1px solid #ccc; border-radius: 6px; cursor: pointer; color: white; min-width: 45px; }
     .btn-ev:active { opacity: 0.7; }
-    .bg-add { background: #1976d2; border-color: #0d47a1; }
+    .bg-add { background: #4caf50; border-color: #388e3c; } /* トライ：緑に変更 */
     .bg-ok { background: #4caf50; border-color: #388e3c; }
     .bg-ng { background: #e53935; border-color: #c62828; }
-    .bg-keep { background: #fb8c00; border-color: #ef6c00; }
-    .bg-lost { background: #757575; border-color: #424242; }
+    .bg-keep { background: #4caf50; border-color: #388e3c; } /* キープ：緑に変更 */
+    .bg-lost { background: #e53935; border-color: #c62828; } /* ロスト：赤に変更 */
 
     .stat-text { display: block; font-size: 0.75rem; color: #666; margin-top: 4px; }
 
@@ -81,7 +82,8 @@
 </head>
 <body>
 
-  <h1><span id="appTitle">🏉 ラグビー試合記録 v1.1</span></h1>
+  <!-- 時計表示をh1に追加 -->
+  <h1><span id="appTitle">🏉 ラグビー試合記録 v1.2</span><span class="clock-display" id="clockDisplay"></span></h1>
 
   <!-- メイン画面 -->
   <div id="mainView" class="view-container active-view">
@@ -109,9 +111,10 @@
     <table class="event-table">
       <thead>
         <tr>
-          <th id="thLeft" style="width:38%;">シラエビ (左)</th>
+          <!-- 左右のチーム名を削除し、固定表記へ -->
+          <th style="width:38%;">左サイド</th>
           <th style="width:24%;">イベント</th>
-          <th id="thRight" style="width:38%;">ズワイガニ (右)</th>
+          <th style="width:38%;">右サイド</th>
         </tr>
       </thead>
       <tbody>
@@ -250,8 +253,9 @@
         <thead>
           <tr>
             <th>項目</th>
-            <th>左サイド</th>
-            <th>右サイド</th>
+            <!-- スタッツのサイド表記をチーム名にするためのIDを追加 -->
+            <th id="statThLeft">左サイド</th>
+            <th id="statThRight">右サイド</th>
           </tr>
         </thead>
         <tbody id="statsTbody">
@@ -272,6 +276,23 @@
   </div>
 
   <script>
+    // --- 1. 時計表示 ---
+    function updateClock() {
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const MM = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      
+      const clockElem = document.getElementById('clockDisplay');
+      if (clockElem) {
+        clockElem.textContent = ` ${yy}/${MM}/${dd} ${hh}:${mm}`;
+      }
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
     // --- Service Worker 登録 ---
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').then(reg => {
@@ -339,8 +360,7 @@
       const rightName = currentHalf === 'first' ? matchData.teams.B : matchData.teams.A;
       document.getElementById('inputLeft').value = leftName;
       document.getElementById('inputRight').value = rightName;
-      document.getElementById('thLeft').textContent = `${leftName} (左)`;
-      document.getElementById('thRight').textContent = `${rightName} (右)`;
+      // イベントテーブルの左右表記は固定化したため更新不要
     }
 
     // --- タイマー処理 ---
@@ -473,7 +493,7 @@
     }
 
     function goToMain() {
-      document.getElementById('appTitle').textContent = '🏉 ラグビー試合記録 v1.0';
+      document.getElementById('appTitle').textContent = '🏉 ラグビー試合記録 v1.2';
       document.getElementById('summaryView').classList.remove('active-view');
       document.getElementById('mainView').classList.add('active-view');
     }
@@ -503,8 +523,13 @@
       const tA = matchData.teams.A;
       const tB = matchData.teams.B;
       
+      // スコアのヘッダー名
       document.getElementById('scoreTeamA').textContent = tA;
       document.getElementById('scoreTeamB').textContent = tB;
+
+      // スタッツ詳細のヘッダー名にチーム名を反映
+      document.getElementById('statThLeft').textContent = tA;
+      document.getElementById('statThRight').textContent = tB;
       
       const scTbody = document.getElementById('scoreTbody');
       scTbody.innerHTML = `
