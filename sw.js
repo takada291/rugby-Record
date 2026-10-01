@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rugby-record-cache-v1';
+const CACHE_NAME = 'rugby-record-cache-v1.1';
 const urlsToCache = [
   './',
   './index.html',
